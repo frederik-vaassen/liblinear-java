@@ -1,22 +1,13 @@
 package de.bwaldvogel.liblinear;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.Closeable;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.Reader;
-import java.io.Writer;
+import java.io.*;
 import java.nio.charset.Charset;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Formatter;
 import java.util.Locale;
 import java.util.Random;
+import java.util.logging.*;
 import java.util.regex.Pattern;
 
 
@@ -32,15 +23,63 @@ import java.util.regex.Pattern;
  */
 public class Linear {
 
-    static final Charset       FILE_CHARSET        = Charset.forName("ISO-8859-1");
+    static final Charset        FILE_CHARSET        = Charset.forName("ISO-8859-1");
 
-    static final Locale        DEFAULT_LOCALE      = Locale.ENGLISH;
+    static final Locale         DEFAULT_LOCALE      = Locale.ENGLISH;
 
-    private static Object      OUTPUT_MUTEX        = new Object();
-    private static PrintStream DEBUG_OUTPUT        = System.out;
+    private final static Object OUTPUT_MUTEX        = new Object();
 
-    private static final long  DEFAULT_RANDOM_SEED = 0L;
-    static Random              random              = new Random(DEFAULT_RANDOM_SEED);
+    private static final long   DEFAULT_RANDOM_SEED = 0L;
+    static Random               random              = new Random(DEFAULT_RANDOM_SEED);
+
+    // Logging setup
+    static private final Logger                         LOGGER              = Logger.getLogger(Linear.class.getName());
+    static private final SimpleDateFormat               SDF       = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+
+    static private final java.util.logging.Formatter    LOG_FORMATTER = new java.util.logging.Formatter() {
+        @Override
+        public String format(LogRecord record) {
+            final String loggerName = record.getLoggerName();
+            final long time = record.getMillis();
+            final Level level = record.getLevel();
+            final String message = record.getMessage();
+            final int threadID = record.getThreadID();
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(time);
+            final String date = SDF.format(c.getTime());
+            return String.format("%s || %s [THREAD #%s] || %s || %s", date, loggerName, threadID, level, message);
+        }
+    };
+
+    static private Handler                              LOG_HANDLER         = new Handler() {
+        @Override
+        public void publish(LogRecord record) {
+            if (getFormatter() == null) {
+                setFormatter(LOG_FORMATTER);
+            }
+            try {
+                final String message = getFormatter().format(record);
+                if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+                    System.err.write(message.getBytes());
+                } else {
+                    System.out.write(message.getBytes());
+                }
+            } catch (IOException exception) {
+                reportError(null, exception, ErrorManager.FORMAT_FAILURE);
+            }
+        }
+
+        @Override
+        public void flush() {}
+
+        @Override
+        public void close() throws SecurityException {}
+    };
+
+    static {
+        LOG_HANDLER.setFormatter(LOG_FORMATTER);
+        LOGGER.addHandler(LOG_HANDLER);
+    }
 
     /**
      * @param target predicted classes
@@ -52,7 +91,7 @@ public class Linear {
 
         if (nr_fold > l) {
             nr_fold = l;
-            System.err.println("WARNING: # folds > # data. Will use # folds = # data instead (i.e., leave-one-out cross validation)");
+            LOGGER.warning("# folds > # data. Will use # folds = # data instead (i.e., leave-one-out cross validation)");
         }
         int[] fold_start = new int[nr_fold + 1];
 
@@ -175,17 +214,13 @@ public class Linear {
 
     static void info(String message) {
         synchronized (OUTPUT_MUTEX) {
-            if (DEBUG_OUTPUT == null) return;
-            DEBUG_OUTPUT.printf(message);
-            DEBUG_OUTPUT.flush();
+            LOGGER.info(message);
         }
     }
 
     static void info(String format, Object... args) {
         synchronized (OUTPUT_MUTEX) {
-            if (DEBUG_OUTPUT == null) return;
-            DEBUG_OUTPUT.printf(format, args);
-            DEBUG_OUTPUT.flush();
+            LOGGER.info(String.format(format, args));
         }
     }
 
@@ -246,14 +281,14 @@ public class Linear {
 
         Pattern whitespace = Pattern.compile("\\s+");
 
-        BufferedReader reader = null;
+        BufferedReader reader;
         if (inputReader instanceof BufferedReader) {
             reader = (BufferedReader)inputReader;
         } else {
             reader = new BufferedReader(inputReader);
         }
 
-        String line = null;
+        String line;
         while ((line = reader.readLine()) != null) {
             String[] split = whitespace.split(line);
             if (split[0].equals("solver_type")) {
@@ -264,7 +299,6 @@ public class Linear {
                 model.solverType = solver;
             } else if (split[0].equals("nr_class")) {
                 model.nr_class = atoi(split[1]);
-                Integer.parseInt(split[1]);
             } else if (split[0].equals("nr_feature")) {
                 model.nr_feature = atoi(split[1]);
             } else if (split[0].equals("bias")) {
@@ -329,7 +363,9 @@ public class Linear {
         if (c == null) return;
         try {
             c.close();
-        } catch (Throwable t) {}
+        } catch (Throwable t) {
+            LOGGER.finest(t.getMessage());
+        }
     }
 
     public static double predict(Model model, Feature[] x) {
@@ -1587,8 +1623,7 @@ public class Linear {
         prob_col.y = new double[l];
         prob_col.x = new Feature[n][];
 
-        for (int i = 0; i < l; i++)
-            prob_col.y[i] = prob.y[i];
+        System.arraycopy(prob.y, 0, prob_col.y, 0, l);
 
         for (int i = 0; i < l; i++) {
             for (Feature x : prob.x[i]) {
@@ -1690,8 +1725,7 @@ public class Linear {
 
             model.nr_class = nr_class;
             model.label = new int[nr_class];
-            for (int i = 0; i < nr_class; i++)
-                model.label[i] = label[i];
+            System.arraycopy(label, 0, model.label, 0, nr_class);
 
             // calculate weighted C
             double[] weighted_C = new double[nr_class];
@@ -1717,8 +1751,7 @@ public class Linear {
             sub_prob.x = new Feature[sub_prob.l][];
             sub_prob.y = new double[sub_prob.l];
 
-            for (int k = 0; k < sub_prob.l; k++)
-                sub_prob.x[k] = x[k];
+            System.arraycopy(x, 0, sub_prob.x, 0, sub_prob.l);
 
             // multi-class svm by Crammer and Singer
             if (param.solverType == SolverType.MCSVM_CS) {
@@ -1789,7 +1822,7 @@ public class Linear {
 
         double primal_solver_tol = eps * Math.max(Math.min(pos, neg), 1) / prob.l;
 
-        Function fun_obj = null;
+        Function fun_obj;
         switch (param.solverType) {
             case L2R_LR: {
                 double[] C = new double[prob.l];
@@ -1861,12 +1894,39 @@ public class Linear {
     }
 
     public static void enableDebugOutput() {
-        setDebugOutput(System.out);
+        setDebugOutput(new ConsoleHandler());
     }
 
-    public static void setDebugOutput(PrintStream debugOutput) {
+    public static void setDebugOutput(Handler logHandler) {
         synchronized (OUTPUT_MUTEX) {
-            DEBUG_OUTPUT = debugOutput;
+            // Remove existing handlers
+            final Handler[] handlers = LOGGER.getHandlers();
+            for (Handler handler : handlers) {
+                LOGGER.removeHandler(handler);
+            }
+            if (logHandler != null) {
+                logHandler.setFormatter(LOG_FORMATTER);
+                LOG_HANDLER = logHandler;
+                LOGGER.addHandler(LOG_HANDLER);
+            }
+        }
+    }
+
+    public static void setDebugOutput(Handler logHandler, java.util.logging.Formatter logFormatter) {
+        synchronized (OUTPUT_MUTEX) {
+            if (logFormatter == null) {
+                setDebugOutput(logHandler);
+            } else {
+                final Handler[] handlers = LOGGER.getHandlers();
+                for (Handler handler : handlers) {
+                    LOGGER.removeHandler(handler);
+                }
+                if (logHandler != null) {
+                    logHandler.setFormatter(logFormatter);
+                    LOG_HANDLER = logHandler;
+                    LOGGER.addHandler(LOG_HANDLER);
+                }
+            }
         }
     }
 
