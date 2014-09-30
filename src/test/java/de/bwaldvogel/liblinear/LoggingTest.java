@@ -3,7 +3,6 @@ package de.bwaldvogel.liblinear;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.logging.FileHandler;
 
 /**
  * Created by Frederik Vaassen (frederik.vaassen@stepstone.be) on 26/09/2014.
@@ -63,20 +62,23 @@ public class LoggingTest {
 
     @Test
     public void testDefaultLogger() {
+        while (true) {
+            final Model model = Linear.train(getDummyProblem(), parameter);
+        }
+    }
+
+    @Test
+    public void testDisabledLogger() throws IOException {
+
+        Linear.disableDebugOutput();
         final Model model = Linear.train(getDummyProblem(), parameter);
     }
 
     @Test
-    public void testFileLogger() throws IOException {
-        final FileHandler fileHandler = new FileHandler("logs/test.log");
-        Linear.setDebugOutput(fileHandler);
-        final Model model = Linear.train(getDummyProblem(), parameter);
-    }
+    public void testEnabledLogger() throws IOException {
 
-    @Test
-    public void testNullLogger() throws IOException {
-
-        Linear.setDebugOutput(null);
+        Linear.disableDebugOutput();
+        Linear.enableDebugOutput();
         final Model model = Linear.train(getDummyProblem(), parameter);
     }
 

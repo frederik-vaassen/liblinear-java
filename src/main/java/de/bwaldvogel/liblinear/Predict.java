@@ -1,10 +1,6 @@
 package de.bwaldvogel.liblinear;
 
-import static de.bwaldvogel.liblinear.Linear.atof;
-import static de.bwaldvogel.liblinear.Linear.atoi;
-import static de.bwaldvogel.liblinear.Linear.closeQuietly;
-import static de.bwaldvogel.liblinear.Linear.printf;
-import static de.bwaldvogel.liblinear.Linear.info;
+import org.apache.logging.log4j.Level;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -21,6 +17,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
+
+import static de.bwaldvogel.liblinear.Linear.*;
 
 
 public class Predict {
@@ -133,11 +131,11 @@ public class Predict {
 
         if (model.solverType.isSupportVectorRegression()) //
         {
-            info("Mean squared error = %g (regression)%n", error / total);
-            info("Squared correlation coefficient = %g (regression)%n", //
+            log(Level.INFO, "Mean squared error = %g (regression)%n", error / total);
+            log(Level.INFO, "Squared correlation coefficient = %g (regression)%n", //
                 ((total * sumpt - sump * sumt) * (total * sumpt - sump * sumt)) / ((total * sumpp - sump * sump) * (total * sumtt - sumt * sumt)));
         } else {
-            info("Accuracy = %g%% (%d/%d)%n", (double)correct / total * 100, correct, total);
+            log(Level.INFO, "Accuracy = %g%% (%d/%d)%n", (double)correct / total * 100, correct, total);
         }
     }
 

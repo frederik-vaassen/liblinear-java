@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="warn">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg" />
+        </Console>
+        <RollingFile name="File" fileName="logs/liblinear.log" filePattern="logs/liblinear.%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg" />
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="5" />
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="trace">
+            <AppenderRef ref="Console" level="debug" />
+            <AppenderRef ref="File" level="info" />
+        </Root>
+    </Loggers>
+</Configuration>

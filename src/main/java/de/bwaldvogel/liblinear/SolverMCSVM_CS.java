@@ -1,7 +1,9 @@
 package de.bwaldvogel.liblinear;
 
+import org.apache.logging.log4j.Level;
+
 import static de.bwaldvogel.liblinear.Linear.copyOf;
-import static de.bwaldvogel.liblinear.Linear.info;
+import static de.bwaldvogel.liblinear.Linear.log;
 import static de.bwaldvogel.liblinear.Linear.swap;
 
 
@@ -218,7 +220,7 @@ class SolverMCSVM_CS {
             iter++;
 
             if (iter % 10 == 0) {
-                info(".");
+                log(Level.DEBUG, ".");
             }
 
             if (stopping < eps_shrink) {
@@ -228,7 +230,7 @@ class SolverMCSVM_CS {
                     active_size = l;
                     for (i = 0; i < l; i++)
                         active_size_i[i] = nr_class;
-                    info("*");
+                    log(Level.DEBUG, "*");
                     eps_shrink = Math.max(eps_shrink / 2, eps);
                     start_from_all = true;
                 }
@@ -236,8 +238,8 @@ class SolverMCSVM_CS {
                 start_from_all = false;
         }
 
-        info("%noptimization finished, #iter = %d%n", iter);
-        if (iter >= max_iter) info("%nWARNING: reaching max number of iterations%n");
+        log(Level.INFO, "%noptimization finished, #iter = %d%n", iter);
+        if (iter >= max_iter) log(Level.WARN, "%nWARNING: reaching max number of iterations%n");
 
         // calculate objective value
         double v = 0;
@@ -251,8 +253,8 @@ class SolverMCSVM_CS {
         }
         for (i = 0; i < l; i++)
             v -= alpha[i * nr_class + (int)prob.y[i]];
-        info("Objective value = %f%n", v);
-        info("nSV = %d%n", nSV);
+        log(Level.DEBUG, "Objective value = %f%n", v);
+        log(Level.DEBUG, "nSV = %d%n", nSV);
 
     }
 

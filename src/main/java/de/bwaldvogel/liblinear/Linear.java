@@ -1,15 +1,15 @@
 package de.bwaldvogel.liblinear;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.*;
 import java.nio.charset.Charset;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Formatter;
 import java.util.Locale;
 import java.util.Random;
-import java.util.logging.*;
 import java.util.regex.Pattern;
-
 
 /**
  * <h2>Java port of <a href="http://www.csie.ntu.edu.tw/~cjlin/liblinear/">liblinear</a></h2>
@@ -27,60 +27,16 @@ public class Linear {
 
     static final Locale         DEFAULT_LOCALE      = Locale.ENGLISH;
 
-    private final static Object OUTPUT_MUTEX        = new Object();
-
     private static final long   DEFAULT_RANDOM_SEED = 0L;
     static Random               random              = new Random(DEFAULT_RANDOM_SEED);
 
-    // Logging setup
-    static private final Logger                         LOGGER              = Logger.getLogger(Linear.class.getName());
-    static private final SimpleDateFormat               SDF       = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
-
-    static private final java.util.logging.Formatter    LOG_FORMATTER = new java.util.logging.Formatter() {
-        @Override
-        public String format(LogRecord record) {
-            final String loggerName = record.getLoggerName();
-            final long time = record.getMillis();
-            final Level level = record.getLevel();
-            final String message = record.getMessage();
-            final int threadID = record.getThreadID();
-            Calendar c = Calendar.getInstance();
-            c.setTimeInMillis(time);
-            final String date = SDF.format(c.getTime());
-            return String.format("%s || %s [THREAD #%s] || %s || %s", date, loggerName, threadID, level, message);
+    private static Logger       LOGGER              = LogManager.getLogger(Linear.class.getName());
+    static void log(Level level, String message, Object... args) {
+        if (LOGGER != null) {
+            LOGGER.log(level, String.format(message, args));
         }
-    };
-
-    static private Handler                              LOG_HANDLER         = new Handler() {
-        @Override
-        public void publish(LogRecord record) {
-            if (getFormatter() == null) {
-                setFormatter(LOG_FORMATTER);
-            }
-            try {
-                final String message = getFormatter().format(record);
-                if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
-                    System.err.write(message.getBytes());
-                } else {
-                    System.out.write(message.getBytes());
-                }
-            } catch (IOException exception) {
-                reportError(null, exception, ErrorManager.FORMAT_FAILURE);
-            }
-        }
-
-        @Override
-        public void flush() {}
-
-        @Override
-        public void close() throws SecurityException {}
-    };
-
-    static {
-        LOG_HANDLER.setFormatter(LOG_FORMATTER);
-        LOGGER.addHandler(LOG_HANDLER);
     }
-
+    
     /**
      * @param target predicted classes
      */
@@ -91,7 +47,7 @@ public class Linear {
 
         if (nr_fold > l) {
             nr_fold = l;
-            LOGGER.warning("# folds > # data. Will use # folds = # data instead (i.e., leave-one-out cross validation)");
+            log(Level.WARN, "# folds > # data. Will use # folds = # data instead (i.e., leave-one-out cross validation)%n");
         }
         int[] fold_start = new int[nr_fold + 1];
 
@@ -210,18 +166,6 @@ public class Linear {
             start[i] = start[i - 1] + count[i - 1];
 
         return new GroupClassesReturn(nr_class, label, start, count);
-    }
-
-    static void info(String message) {
-        synchronized (OUTPUT_MUTEX) {
-            LOGGER.info(message);
-        }
-    }
-
-    static void info(String format, Object... args) {
-        synchronized (OUTPUT_MUTEX) {
-            LOGGER.info(String.format(format, args));
-        }
     }
 
     /**
@@ -364,7 +308,7 @@ public class Linear {
         try {
             c.close();
         } catch (Throwable t) {
-            LOGGER.finest(t.getMessage());
+            log(Level.TRACE, t.getMessage());
         }
     }
 
@@ -677,14 +621,14 @@ public class Linear {
             }
 
             iter++;
-            if (iter % 10 == 0) info(".");
+            if (iter % 10 == 0) log(Level.DEBUG, ".");
 
             if (PGmax_new - PGmin_new <= eps) {
                 if (active_size == l)
                     break;
                 else {
                     active_size = l;
-                    info("*");
+                    log(Level.DEBUG, "*");
                     PGmax_old = Double.POSITIVE_INFINITY;
                     PGmin_old = Double.NEGATIVE_INFINITY;
                     continue;
@@ -696,8 +640,8 @@ public class Linear {
             if (PGmin_old >= 0) PGmin_old = Double.NEGATIVE_INFINITY;
         }
 
-        info("%noptimization finished, #iter = %d%n", iter);
-        if (iter >= max_iter) info("%nWARNING: reaching max number of iterations%nUsing -s 2 may be faster (also see FAQ)%n%n");
+        log(Level.DEBUG, "%noptimization finished, #iter = %d%n", iter);
+        if (iter >= max_iter) log(Level.WARN, "%nWARNING: reaching max number of iterations%nUsing -s 2 may be faster (also see FAQ)%n%n");
 
         // calculate objective value
 
@@ -709,8 +653,8 @@ public class Linear {
             v += alpha[i] * (alpha[i] * diag[GETI(y, i)] - 2);
             if (alpha[i] > 0) ++nSV;
         }
-        info("Objective value = %g%n", v / 2);
-        info("nSV = %d%n", nSV);
+        log(Level.DEBUG, "Objective value = %g%n", v / 2);
+        log(Level.DEBUG, "nSV = %d%n", nSV);
     }
 
     // To support weights for instances, use GETI(i) (i)
@@ -873,14 +817,14 @@ public class Linear {
 
             if (iter == 0) Gnorm1_init = Gnorm1_new;
             iter++;
-            if (iter % 10 == 0) info(".");
+            if (iter % 10 == 0) log(Level.DEBUG, ".");
 
             if (Gnorm1_new <= eps * Gnorm1_init) {
                 if (active_size == l)
                     break;
                 else {
                     active_size = l;
-                    info("*");
+                    log(Level.DEBUG, "*");
                     Gmax_old = Double.POSITIVE_INFINITY;
                     continue;
                 }
@@ -889,8 +833,8 @@ public class Linear {
             Gmax_old = Gmax_new;
         }
 
-        info("%noptimization finished, #iter = %d%n", iter);
-        if (iter >= max_iter) info("%nWARNING: reaching max number of iterations%nUsing -s 11 may be faster%n%n");
+        log(Level.INFO, "%noptimization finished, #iter = %d%n", iter);
+        if (iter >= max_iter) log(Level.WARN, "%nWARNING: reaching max number of iterations%nUsing -s 11 may be faster%n%n");
 
         // calculate objective value
         double v = 0;
@@ -903,8 +847,8 @@ public class Linear {
             if (beta[i] != 0) nSV++;
         }
 
-        info("Objective value = %g%n", v);
-        info("nSV = %d%n", nSV);
+        log(Level.DEBUG, "Objective value = %g%n", v);
+        log(Level.DEBUG, "nSV = %d%n", nSV);
     }
 
     /**
@@ -1032,7 +976,7 @@ public class Linear {
             }
 
             iter++;
-            if (iter % 10 == 0) info(".");
+            if (iter % 10 == 0) log(Level.DEBUG, ".");
 
             if (Gmax < eps) break;
 
@@ -1042,8 +986,8 @@ public class Linear {
 
         }
 
-        info("%noptimization finished, #iter = %d%n", iter);
-        if (iter >= max_iter) info("%nWARNING: reaching max number of iterations%nUsing -s 0 may be faster (also see FAQ)%n%n");
+        log(Level.INFO, "%noptimization finished, #iter = %d%n", iter);
+        if (iter >= max_iter) log(Level.WARN, "%nWARNING: reaching max number of iterations%nUsing -s 0 may be faster (also see FAQ)%n%n");
 
         // calculate objective value
 
@@ -1054,7 +998,7 @@ public class Linear {
         for (i = 0; i < l; i++)
             v += alpha[2 * i] * Math.log(alpha[2 * i]) + alpha[2 * i + 1] * Math.log(alpha[2 * i + 1]) - upper_bound[GETI(y, i)]
                 * Math.log(upper_bound[GETI(y, i)]);
-        info("Objective value = %g%n", v);
+        log(Level.DEBUG, "Objective value = %g%n", v);
     }
 
     /**
@@ -1240,7 +1184,7 @@ public class Linear {
 
                 // recompute b[] if line search takes too many steps
                 if (num_linesearch >= max_num_linesearch) {
-                    info("#");
+                    log(Level.DEBUG, "#");
                     for (int i = 0; i < l; i++)
                         b[i] = 1;
 
@@ -1257,14 +1201,14 @@ public class Linear {
                 Gnorm1_init = Gnorm1_new;
             }
             iter++;
-            if (iter % 10 == 0) info(".");
+            if (iter % 10 == 0) log(Level.DEBUG, ".");
 
             if (Gmax_new <= eps * Gnorm1_init) {
                 if (active_size == w_size)
                     break;
                 else {
                     active_size = w_size;
-                    info("*");
+                    log(Level.DEBUG, "*");
                     Gmax_old = Double.POSITIVE_INFINITY;
                     continue;
                 }
@@ -1273,8 +1217,8 @@ public class Linear {
             Gmax_old = Gmax_new;
         }
 
-        info("%noptimization finished, #iter = %d%n", iter);
-        if (iter >= max_iter) info("%nWARNING: reaching max number of iterations%n");
+        log(Level.INFO, "%noptimization finished, #iter = %d%n", iter);
+        if (iter >= max_iter) log(Level.WARN, "%nWARNING: reaching max number of iterations%n");
 
         // calculate objective value
 
@@ -1292,8 +1236,8 @@ public class Linear {
         for (j = 0; j < l; j++)
             if (b[j] > 0) v += C[GETI(y, j)] * b[j] * b[j];
 
-        info("Objective value = %g%n", v);
-        info("#nonzeros/#features = %d/%d%n", nnz, w_size);
+        log(Level.DEBUG, "Objective value = %g%n", v);
+        log(Level.DEBUG, "#nonzeros/#features = %d/%d%n", nnz, w_size);
     }
 
     /**
@@ -1517,7 +1461,7 @@ public class Linear {
                 QP_Gmax_old = QP_Gmax_new;
             }
 
-            if (iter >= max_iter) info("WARNING: reaching max number of inner iterations%n");
+            if (iter >= max_iter) log(Level.WARN, "WARNING: reaching max number of inner iterations%n");
 
             delta = 0;
             w_norm_new = 0;
@@ -1586,12 +1530,12 @@ public class Linear {
             newton_iter++;
             Gmax_old = Gmax_new;
 
-            info("iter %3d  #CD cycles %d%n", newton_iter, iter);
+            log(Level.DEBUG, "iter %3d  #CD cycles %d%n", newton_iter, iter);
         }
 
-        info("=========================%n");
-        info("optimization finished, #iter = %d%n", newton_iter);
-        if (newton_iter >= max_newton_iter) info("WARNING: reaching max number of iterations%n");
+        log(Level.INFO, "=========================%n");
+        log(Level.INFO, "optimization finished, #iter = %d%n", newton_iter);
+        if (newton_iter >= max_newton_iter) log(Level.WARN, "WARNING: reaching max number of iterations%n");
 
         // calculate objective value
 
@@ -1608,8 +1552,8 @@ public class Linear {
             else
                 v += C[GETI(y, j)] * Math.log(1 + exp_wTx[j]);
 
-        info("Objective value = %g%n", v);
-        info("#nonzeros/#features = %d/%d%n", nnz, w_size);
+        log(Level.DEBUG, "Objective value = %g%n", v);
+        log(Level.DEBUG, "#nonzeros/#features = %d/%d%n", nnz, w_size);
     }
 
     // transpose matrix X from row format to column format
@@ -1890,44 +1834,11 @@ public class Linear {
     }
 
     public static void disableDebugOutput() {
-        setDebugOutput(null);
+        LOGGER = null;
     }
 
     public static void enableDebugOutput() {
-        setDebugOutput(new ConsoleHandler());
-    }
-
-    public static void setDebugOutput(Handler logHandler) {
-        synchronized (OUTPUT_MUTEX) {
-            // Remove existing handlers
-            final Handler[] handlers = LOGGER.getHandlers();
-            for (Handler handler : handlers) {
-                LOGGER.removeHandler(handler);
-            }
-            if (logHandler != null) {
-                logHandler.setFormatter(LOG_FORMATTER);
-                LOG_HANDLER = logHandler;
-                LOGGER.addHandler(LOG_HANDLER);
-            }
-        }
-    }
-
-    public static void setDebugOutput(Handler logHandler, java.util.logging.Formatter logFormatter) {
-        synchronized (OUTPUT_MUTEX) {
-            if (logFormatter == null) {
-                setDebugOutput(logHandler);
-            } else {
-                final Handler[] handlers = LOGGER.getHandlers();
-                for (Handler handler : handlers) {
-                    LOGGER.removeHandler(handler);
-                }
-                if (logHandler != null) {
-                    logHandler.setFormatter(logFormatter);
-                    LOG_HANDLER = logHandler;
-                    LOGGER.addHandler(LOG_HANDLER);
-                }
-            }
-        }
+        LOGGER = LogManager.getLogger(Linear.class.getName());
     }
 
     /**

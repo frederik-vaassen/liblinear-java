@@ -1,6 +1,8 @@
 package de.bwaldvogel.liblinear;
 
-import static de.bwaldvogel.liblinear.Linear.info;
+import org.apache.logging.log4j.Level;
+
+import static de.bwaldvogel.liblinear.Linear.log;
 
 /**
  * Trust Region Newton Method optimization
@@ -91,7 +93,7 @@ class Tron {
             else
                 delta = Math.max(delta, Math.min(alpha * snorm, sigma3 * delta));
 
-            info("iter %2d act %5.3e pre %5.3e delta %5.3e f %5.3e |g| %5.3e CG %3d%n", iter, actred, prered, delta, f, gnorm, cg_iter);
+            log(Level.DEBUG, "iter %2d act %5.3e pre %5.3e delta %5.3e f %5.3e |g| %5.3e CG %3d%n", iter, actred, prered, delta, f, gnorm, cg_iter);
 
             if (actred > eta0 * prered) {
                 iter++;
@@ -103,15 +105,15 @@ class Tron {
                 if (gnorm <= eps * gnorm1) break;
             }
             if (f < -1.0e+32) {
-                info("WARNING: f < -1.0e+32%n");
+                log(Level.WARN, "WARNING: f < -1.0e+32%n");
                 break;
             }
             if (Math.abs(actred) <= 0 && prered <= 0) {
-                info("WARNING: actred and prered <= 0%n");
+                log(Level.WARN, "WARNING: actred and prered <= 0%n");
                 break;
             }
             if (Math.abs(actred) <= 1.0e-12 * Math.abs(f) && Math.abs(prered) <= 1.0e-12 * Math.abs(f)) {
-                info("WARNING: actred and prered too small%n");
+                log(Level.WARN, "WARNING: actred and prered too small%n");
                 break;
             }
         }
@@ -142,7 +144,7 @@ class Tron {
             double alpha = rTr / dot(d, Hd);
             daxpy(alpha, d, s);
             if (euclideanNorm(s) > delta) {
-                info("cg reaches trust region boundary%n");
+                log(Level.DEBUG, "cg reaches trust region boundary%n");
                 alpha = -alpha;
                 daxpy(alpha, d, s);
 
