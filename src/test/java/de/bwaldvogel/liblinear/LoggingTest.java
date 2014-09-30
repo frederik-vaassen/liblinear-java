@@ -62,9 +62,7 @@ public class LoggingTest {
 
     @Test
     public void testDefaultLogger() {
-        while (true) {
-            final Model model = Linear.train(getDummyProblem(), parameter);
-        }
+        final Model model = Linear.train(getDummyProblem(), parameter);
     }
 
     @Test
